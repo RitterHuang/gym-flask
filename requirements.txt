@@ -15,7 +15,7 @@ Jinja2==3.1.1
 Mako==1.2.0
 MarkupSafe==2.1.1
 numpy==1.22.3
-oracledb==1.4.1
+
 SQLAlchemy==1.4.32
 typing-extensions==4.1.1
 Werkzeug==2.0.3
