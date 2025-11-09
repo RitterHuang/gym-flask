@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>選擇合約方案</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/template.css') }}">
+    <style>
+        /* ... (您原有的 plan-choice 樣式) ... */
+        .outer_div {
+            position: absolute; top: 50%; left: 50%; 
+            transform: translate(-50%, -50%);
+            width: 500px; /* 稍微加寬以容納新欄位 */
+        }
+        .plan-options, .payment-options { 
+            margin-top: 25px; 
+            width: 90%;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .plan-choice, .payment-choice {
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #CCCCCC;
+            border-radius: 5px;
+            cursor: pointer;
+            background-color: #FFFFFF;
+            text-align: left;
+        }
+        .plan-choice:hover, .payment-choice:hover { background: #f9f9f9; }
+        .plan-choice input[type="radio"], .payment-choice input[type="radio"] { 
+            margin-right: 10px; 
+        }
+        .plan-choice label, .payment-choice label { 
+            font-size: 1.1em; 
+            cursor: pointer; 
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 1em;
+            margin-top: 20px; 
+        }
+        button[disabled] { background-color: #ccc; cursor: not-allowed; }
+        
+        /* 繼承的 flash 樣式 (以防萬一) */
+        .flash-success { color: green; }
+        .flash-danger { color: red; }
+        .flash-warning { color: #856404; }
+        .flash-message {
+            font-weight: bold;
+            padding-bottom: 10px;
+            font-size: 1.1em;
+        }
+    </style>
+</head>
+<body>
+
+<div class="outer_div">
+
+    <h2 class="register_title" style="margin-bottom: 15px;">選擇您的合約方案</h2>
+    <p style="text-align: center;">
+        您好，<strong>{{ user.name or '會員' }}</strong>！請選擇方案以啟用帳號。
+    </p>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div style="text-align: center;">
+        {% for category, message in messages %}
+          <div class="flash-message {% if category == 'success' %}flash-success{% else %}flash-danger{% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <form class="agreement-form" action="{{ url_for('frontdesk.select_plan') }}" method="POST" style="text-align: center;">
+        
+        <div class="plan-options">
+            <h3 style="text-align: left; margin-bottom: 10px;">請選擇合約方案：</h3>
+            {% if available_plans %}
+                {% for plan in available_plans %}
+                <div class="plan-choice" onclick="document.getElementById('plan_{{ plan.id }}').checked = true;">
+                    <input type="radio" id="plan_{{ plan.id }}" name="planid" value="{{ plan.id }}" required>
+                    <label for="plan_{{ plan.id }}">
+                        <strong>{{ plan.name }}</strong> 
+                        (週期: {{ plan.period }} 個月, 月費: ${{ plan.charge | int }})
+                    </label>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p class="flash-danger" style="text-align: left;">
+                    目前系統未設定任何合約方案，請聯繫客服。
+                </p>
+            {% endif %}
+        </div>
+        
+        <div class="payment-options">
+            <h3 style="text-align: left; margin-bottom: 10px;">請選擇付款方式：</h3>
+            
+            <div class="payment-choice" onclick="document.getElementById('pay_card').checked = true;">
+                <input type="radio" id="pay_card" name="paymentType" value="信用卡" required>
+                <label for="pay_card">信用卡 (線上支付)</label>
+            </div>
+            
+            <div class="payment-choice" onclick="document.getElementById('pay_counter').checked = true;">
+                <input type="radio" id="pay_counter" name="paymentType" value="臨櫃付款">
+                <label for="pay_counter">臨櫃付款 (請至櫃檯辦理)</label>
+            </div>
+        </div>
+        
+        <br>
+        
+        <button type="submit" class="register_btn" style="width: 150px; height: 40px; font-size: 16px;" {% if not available_plans %}disabled{% endif %}>
+            確認方案並啟用
+        </button>
+    </form>
+</div> </body>
+</html>

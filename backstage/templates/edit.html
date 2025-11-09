@@ -1,0 +1,65 @@
+{% extends "backstage.html" %}
+{% block head %}
+{{ super() }}
+
+{% endblock head %}
+
+{% block title %}BookStore{% endblock title%}
+
+{% block content%}
+
+
+<br/>
+<div class="container-xl">
+  <br/>
+  <form method="post" enctype=multipart/form-data action={{ url_for('manager.edit') }}>
+    <table class="table table-bordered">
+      <tr>
+        <th>課程編號</th>
+        <td><input class="form-control" type="text" value="{{ data.課程編號 }}" name="courseid" readonly class="id_input"></td>
+      </tr>
+      <tr>
+        <th>課程名稱</th>
+        <td><input class="form-control" type="text" value="{{ data.課程名稱 }}" name="coursename" required></td>
+      </tr>
+      <tr>
+        <th>教室</th>
+        <td>
+          <select class="form-control" name="classroom">
+            {% if data.教室 == 'A' %}
+              <option value="A" selected>教室A</option>
+              <option value="BK">教室B</option>
+              <option value="C">教室C</option>
+            {% elif data.教室 == 'B' %}
+              <option value="A">教室A</option>
+              <option value="B" selected>教室B</option>
+              <option value="C">教室C</option>
+            {% elif data.教室 == 'C' %}
+              <option value="A">教室A</option>
+              <option value="B">教室B</option>
+              <option value="C"selected>教室C</option>
+            {% else %}
+              <option value="A" selected>教室A</option>
+              <option value="B">教室B</option>
+              <option value="C">教室C</option>
+            {% endif %}      
+        </select>
+      </tr>
+      <tr>
+        <th>學員人數限制</th>
+        <td><input class="form-control" type="text" value="{{ data.學員人數限制 }}" name="qtylimit" required></td>
+      </tr>
+    </table>
+    <center>
+      <div class="option">
+        <button class="btn btn-outline-success" type="submit">確定修改</button> 
+        <a href="{{ url_for('manager.courseManager') }}"><button class="btn btn-outline-danger">回課程管理</button></a>
+      </div>
+    </center>
+
+  </form>
+</div>
+
+
+
+{% endblock content%}

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}歡迎來到健身房預約系統{% endblock title%}
+
+{% block content%}
+<div class="background-icons">
+    <span>🏋️</span>
+    <span>🏸</span>
+    <span>⚾</span>
+    <span>👟</span>
+    <span>🏀</span>
+    <span>🎾</span>
+    <span>💪</span>
+    <span>🚴</span>
+</div>
+
+<div class="index-container">
+    <img class="index-logo" src="{{ url_for('static', filename='./img/logo.png') }}">
+    
+    <h1 class="index-title">
+        健身房預約系統
+    </h1>
+    
+    <div class="btn_div">
+        <a href="{{ url_for('api.register') }}">
+            <button type"button" class="index_btn">註冊</button>
+        </a>
+        <a href="{{ url_for('api.login') }}">
+            <button type"button" class="index_btn">登入</button>
+        </a>
+    </div>
+</div>
+{% endblock content%}

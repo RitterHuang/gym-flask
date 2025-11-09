@@ -1,0 +1,109 @@
+{% extends "backstage.html" %}
+
+{% block title %}課程時段管理{% endblock %}
+
+{% block content %}
+
+<style>
+    .container { display: flex; gap: 40px; }
+    /* 為 .form-section 和 .list-section 增加一些內邊距(padding)
+      使其與您的 courseManager 頁面 風格更一致
+    */
+    .form-section, .list-section { 
+        flex: 1; 
+        padding: 20px; 
+    }
+    form { display: grid; grid-template-columns: 100px 1fr; gap: 10px; max-width: 400px; }
+    form label { grid-column: 1 / 2; text-align: right; padding-top: 5px; }
+    form input, form select, form button { grid-column: 2 / 3; padding: 5px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background-color: #f2f2f2; }
+    tr:nth-child(even) { background-color: #f9f9f9; }
+    .delete-btn {
+        background-color: #f44336; color: white; border: none;
+        padding: 5px 10px; cursor: pointer; border-radius: 3px;
+    }
+</style>
+
+<div class="container">
+    
+    <div class="form-section">
+        <h2>新增課程時段</h2>
+        <form action="{{ url_for('manager.courseSchedule') }}" method="POST">
+            
+            <label for="courseId">課程：</label>
+            <select id="courseId" name="courseid" required>
+                {% for course in courses %}
+                    <option value="{{ course.courseid }}">{{ course.coursename }}</option>
+                {% endfor %}
+            </select>
+
+            <label for="coachId">教練：</label>
+            <select id="coachId" name="coachid" required>
+                {% for coach in coaches %}
+                    <option value="{{ coach.coachid }}">{{ coach.cname }}</option>
+                {% endfor %}
+            </select>
+
+            <label for="scheduleDate">日期：</label>
+            <input type="date" id="scheduleDate" name="scheduledate" required>
+
+            <label for="timeSlot">時段：</label>
+            <select id="timeSlot" name="timeslot" required>
+                
+                <option value="" disabled selected>請選擇時段</option>
+                
+                <option value="07:15-08:15">07:15-08:15</option>
+                <option value="08:30-09:30">08:30-09:30</option>
+                <option value="09:45-10:45">09:45-10:45</option>
+                <option value="11:00-12:00">11:00-12:00</option>
+                <option value="12:15-13:15">12:15-13:15</option>
+                <option value="14:00-15:00">14:00-15:00</option>
+                <option value="15:15-16:15">15:15-16:15</option>
+                <option value="16:30-17:30">16:30-17:30</option>
+                <option value="17:45-18:45">17:45-18:45</option>
+                <option value="19:00-20:00">19:00-20:00</option>
+                <option value="20:15-21:15">20:15-21:15</option>
+                <option value="21:30-22:30">21:30-22:30</option>
+            </select>
+
+            <button type="submit">新增排程</button>
+        </form>
+    </div>
+
+    <div class="list-section">
+        <h2>現有排程</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>課程名稱</th>
+                    <th>教練</th>
+                    <th>日期</th>
+                    <th>時段</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for schedule in schedules %}
+                <tr>
+                    <td>{{ schedule.coursename }}</td>
+                    <td>{{ schedule.cname }}</td>
+                    <td>{{ schedule.scheduledate }}</td>
+                    <td>{{ schedule.timeslot }}</td>
+                    <td>
+                        <form action="{{ url_for('manager.delete_courseSchedule') }}" method="POST" style="display:inline;">
+                            <input type="hidden" name="courseid" value="{{ schedule.courseid }}">
+                            <input type="hidden" name="scheduledate" value="{{ schedule.scheduledate }}">
+                            <input type="hidden" name="timeslot" value="{{ schedule.timeslot }}">
+                            <button type="submit" class="delete-btn">刪除</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock content %}

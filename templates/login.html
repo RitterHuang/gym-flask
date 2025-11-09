@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block head %}
+{{ super() }}
+{% endblock head %}
+
+{% block title %}Login Page{% endblock title%}
+
+{% block content%}
+<div class="position-absolute top-50 start-50 translate-middle outer_div ">
+    <a href="{{ url_for('index') }}"><img class="icon" src="{{ url_for('static', filename='./img/logo.png') }}"></a>
+    
+    <h1 class="register_title mb-4 mt-4">會員 / 教練登入</h1>
+    
+    <div class="form_div">
+        <form  method='post' action={{ url_for('api.login') }} >
+            
+            <div class="form-row">
+                <label for="account_input">會員 / 教練代碼：</label>
+                <input type="text" name="account" id="account_input" placeholder="請輸入您的 ID" required/>
+            </div>
+
+            <div class="form-row">
+                <label for="password_input">密碼：</label>
+                <input type="password" name="password" id="password_input" required/>
+            </div>
+            
+            {% with messages = get_flashed_messages() %}
+            {% if messages %}
+            <div class="form-row">
+                <label></label> <div class="flash-message"> {% for i in messages %}
+                        {{ i }}
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            {% endwith %}
+
+            <div class="form-row button-row">
+                <a href="{{ url_for('index') }}">
+                    <button type="button" class="register_btn" style="margin-right: 15px;">回上頁</button>
+                </a>
+                <button type="submit" class="register_btn">登入</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock content%}

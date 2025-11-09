@@ -1,0 +1,77 @@
+{% extends "backstage.html" %}
+
+{% block title %}合約種類管理{% endblock title %}
+
+{% block content %}
+
+<style>
+    .container { display: flex; gap: 40px; }
+    .form-section, .list-section { 
+        flex: 1; 
+        padding: 20px; 
+    }
+    form { display: grid; grid-template-columns: 100px 1fr; gap: 10px; max-width: 400px; }
+    form label { grid-column: 1 / 2; text-align: right; padding-top: 5px; }
+    form input, form select, form button { grid-column: 2 / 3; padding: 5px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background-color: #f2f2f2; }
+    tr:nth-child(even) { background-color: #f9f9f9; }
+    .delete-btn {
+        background-color: #f44336; color: white; border: none;
+        padding: 5px 10px; cursor: pointer; border-radius: 3px;
+    }
+</style>
+
+<div class="container">
+    
+    <div class="form-section">
+        <h2>新增合約方案</h2>
+        <form action="{{ url_for('manager.plan') }}" method="POST">
+            
+            <label for="planname">方案名稱：</label>
+            <input type="text" id="planname" name="planname" maxlength="100" required>
+
+            <label for="period">合約期(月)：</label>
+            <input type="number" id="period" name="period" min="1" required>
+
+            <label for="monthlycharge">月費：</label>
+            <input type="number" id="monthlycharge" name="monthlycharge" min="0" max="9999" required>
+
+            <button type="submit">新增方案</button>
+        </form>
+    </div>
+
+    <div class="list-section">
+        <h2>現有方案</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>方案編號</th>
+                    <th>方案名稱</th>
+                    <th>合約期 (月)</th>
+                    <th>月費</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for plan in plans %}
+                <tr>
+                    <td>{{ plan.planid }}</td>
+                    <td>{{ plan.planname }}</td>
+                    <td>{{ plan.period }}</td>
+                    <td>{{ plan.monthlycharge }}</td>
+                    <td>
+                        <form action="{{ url_for('manager.delete_plan') }}" method="POST" style="display:inline;">
+                            <input type="hidden" name="planid" value="{{ plan.planid }}">
+                            <button type="submit" class="delete-btn">刪除</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock content %}

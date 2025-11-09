@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+   
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>課程預約</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/template.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        /* ... (所有 style 樣式與您提供的檔案相同) ... */
+        .outer_div {
+            width: 95% !important;
+            max-width: 1600px;
+            margin: 20px auto 0 auto;
+            padding: 20px 30px 40px 30px;
+        }
+        .calendar-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .calendar-nav h2 { margin: 0; font-size: 1.8em; }
+        .nav-btn {
+            background-color: #003D5C;
+            color: white;
+            font-weight: bolder;
+            border-radius: 10px;
+            border: 0px;
+            cursor: pointer;
+            padding: 8px 15px;
+            font-size: 1em;
+            text-decoration: none;
+        }
+        .nav-btn:hover { opacity: 0.8; }
+        .nav-btn-disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        .calendar-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        .calendar-table th, .calendar-table td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: center;
+            height: 120px;
+            vertical-align: top;
+            font-size: 0.9em;
+            word-wrap: break-word;
+        }
+        .calendar-table th {
+            background-color: #f4f4f4;
+            height: auto;
+            padding: 10px 5px;
+            font-size: 1em;
+        }
+        .calendar-table th.today { background-color: #007373; color: white; }
+        .calendar-table td.timeslot-header {
+            font-weight: bold;
+            background-color: #f9f9f9;
+            vertical-align: middle;
+            height: auto;
+            padding: 12px 5px;
+            font-size: 1em;
+        }
+        .course-cell { text-align: left; padding: 5px; background-color: #fff; }
+        .course-cell.empty { background-color: #fafafa; }
+        .course-cell strong { color: #003D5C; display: block; font-size: 1.1em; }
+        .course-cell span { font-size: 0.95em; color: #555; display: block; margin-top: 3px; }
+        .book-btn, .cancel-btn, .booked-tag, .full-tag {
+            width: 100%;
+            padding: 5px 0;
+            margin-top: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.95em;
+            font-weight: bold;
+            color: white;
+        }
+        .book-btn { background-color: #007bff; }
+        .book-btn:hover { background-color: #0056b3; }
+        .cancel-btn { background-color: #dc3545; }
+        .cancel-btn:hover { background-color: #c82333; }
+        .booked-tag { background-color: #28a745; }
+        .booked-tag:hover { background-color: #dc3545; }
+        .full-tag { background-color: #6c757d; cursor: not-allowed; }
+        .my-courses-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .my-courses-table th, .my-courses-table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+            font-size: 1.05em;
+        }
+        .my-courses-table th { background-color: #f4f4f4; }
+        .flash-success { color: green; }
+        .flash-danger { color: red; }
+        .flash-warning { color: #856404; }
+        .flash-message {
+            font-weight: bold;
+            padding: 15px 0 10px 0;
+            font-size: 1.2em;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+   
+    <a href="{{ url_for('api.logout') }}" class="logout-link-icon">
+        <i class="fas fa-sign-out-alt"></i> 
+        <span>登出</span>
+    </a>
+    <div class="outer_div">
+
+   
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash-message flash-{{ category }} {% if category == 'success' %}flash-success{% else %}flash-danger{% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+        <div class="calendar-nav">
+            {% if week_dates[0] > current_week_start_date %}
+                <a href="{{ url_for('frontdesk.member_home', week_start=prev_week) }}" class="nav-btn">&lt; 上一週</a>
+            {% else %}
+                <span class="nav-btn nav-btn-disabled">&lt; 上一週</span>
+            {% endif %}
+            <h2>課程日曆 ({{ week_dates[0].strftime('%Y/%m/%d') }} - {{ week_dates[-1].strftime('%Y/%m/%d') }})</h2>
+            <a href="{{ url_for('frontdesk.member_home', week_start=next_week) }}" class="nav-btn">下一週 &gt;</a>
+        </div>
+        
+       
+        <table class="calendar-table">
+            <thead>
+                <tr>
+                    <th style="width: 10%;">時段</th>
+                    {% for day in week_dates %}
+                    <th class="{% if day == today %}today{% endif %}">
+                        {{ day.strftime('%Y-%m-%d') }}<br>{{ day.strftime('%a') }}
+                    </th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+               
+                {% for slot in time_slots %}
+                <tr>
+                    <td class="timeslot-header">{{ slot }}</td>
+                    
+                    {% for day in week_dates %}
+                        {% set course = calendar_grid[slot][day] %}
+                        
+                        <td class="course-cell {% if not course %}empty{% endif %}">
+                            {% if course %}
+                                <strong>{{ course.courseName }}</strong>
+                                <span>教練: {{ course.coachName }}</span>
+                                <span>
+                                    人數: ({{ course.current_count }} / {{ course.limit }})
+                                </span>
+                                
+                                {% if course.is_booked_by_me %}
+                                    <form action="{{ url_for('frontdesk.cancel_booking', week_start=current_week_start) }}" method="POST" onsubmit="return confirm('您確定要取消預約此課程嗎？');">
+                                        <input type="hidden" name="courseId" value="{{ course.courseId }}">
+                                        <input type="hidden" name="scheduleDate" value="{{ course.date.isoformat() }}">
+                                        <input type="hidden" name="timeSlot" value="{{ course.timeSlot }}">
+                                        <button type="submit" class="booked-tag">已預約 (點此取消)</button>
+                                    </form>
+                                
+                                {% elif course.is_full %}
+                                    <button class="full-tag" disabled>已額滿</button>
+
+                                {% elif course.is_in_past %}
+                                    <button class="full-tag" disabled>時段已過</button>
+                                {% else %}
+                                    <form action="{{ url_for('frontdesk.book_course') }}" method="POST">
+                                        <input type="hidden" name="courseId" value="{{ course.courseId }}">
+                                        <input type="hidden" name="scheduleDate" value="{{ course.date.isoformat() }}">
+                                        <input type="hidden" name="timeSlot" value="{{ course.timeSlot }}">
+                                        <input type="hidden" name="week_start" value="{{ current_week_start }}">
+                                        <button type="submit" class="book-btn">預約</button>
+                                    </form>
+                                {% endif %}
+                                
+                            {% else %}
+                                {% endif %}
+                        </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+               
+                {% if not time_slots %}
+                <tr>
+                    <td colspan="8" style="height: 100px; text-align: center; vertical-align: middle; font-size: 1.1em;">本週目前無排定課程</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+
+        <hr style="margin: 40px 0 30px 0;">
+
+       
+        <h2 style="font-size: 1.8em;">我的課程 (未來已預約)</h2>
+        <table class="my-courses-table">
+            <thead>
+                <tr>
+                    <th>課程名稱</th>
+                    <th>日期</th>
+                    <th>時段</th>
+                    <th>教練</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if my_bookings %}
+                    {% for b in my_bookings %}
+                    <tr>
+                        <td>{{ b.courseName }}</td>
+                        <td>{{ b.scheduleDate.strftime('%Y-%m-%d (%a)') }}</td>
+                        <td>{{ b.timeSlot }}</td>
+                        <td>{{ b.coachName }}</td>
+                        <td>
+                            <form action="{{ url_for('frontdesk.cancel_booking') }}" method="POST" onsubmit="return confirm('您確定要取消預約此課程嗎？');">
+                                <input type="hidden" name="courseId" value="{{ b.courseId }}">
+                                <input type="hidden" name="scheduleDate" value="{{ b.scheduleDate.isoformat() }}">
+                                <input type="hidden" name="timeSlot" value="{{ b.timeSlot }}">
+                                <button type="submit" class="cancel-btn">取消預約</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 20px;">您目前沒有預約任何未來的課程。</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+
+    </div> </body>
+</html>

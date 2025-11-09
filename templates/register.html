@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block head %}
+{{ super() }}
+{% endblock head %}
+
+{% block title %}Register Page{% endblock title%}
+{% block content%}
+<div class="position-absolute top-50 start-50 translate-middle outer_div">
+    <a href="{{ url_for('index') }}"><img class="icon" src="{{ url_for('static', filename='./img/logo.png') }}"></a>
+    <h1 class="register_title mb-3 mt-3">註冊</h1>
+
+    <div class="form_div">
+        <form method='post' action={{ url_for('api.register') }} >
+            
+            <div class="form-row">
+                <label>選擇註冊的身份：</label>
+                <select name="identity" id="identitySelector" onchange="toggleFields()">
+                    <option value="member" selected>我是會員</option>
+                    <option value="coach">我是教練</option>
+                </select>
+            </div>
+            
+            <div class="form-row">
+                <label id="userIdLabel">會員 ID：</label>
+                <input type="text" name="userId" required/>
+            </div>
+            
+            {% with messages = get_flashed_messages() %}
+            {% if messages %}
+            <div class="form-row">
+                <label></label> <div class="flash-message">
+                    {{ messages[0] }}
+                </div>
+            </div>
+            {% endif %}
+            {% endwith %}
+
+            <div id="memberFields">
+                <div class="form-row">
+                    <label>姓名：</label>
+                    <input type="text" name="mName" required/>
+                </div>
+                <div class="form-row">
+                    <label>生日：</label>
+                    <input type="date" name="birthDate" required/>
+                </div>
+                
+                <div class="form-row">
+                    <label>性別：</label>
+                    <div class="gender-group">
+                        
+                        <div class="gender-option">
+                            <input type="radio" name="gender" value="M" id="gender-m" checked>
+                            <label for="gender-m">男</label>
+                        </div>
+
+                        <div class="gender-option">
+                            <input type="radio" name="gender" value="F" id="gender-f">
+                            <label for="gender-f">女</label>
+                        </div>
+
+                    </div>
+                </div>
+                <div class="form-row">
+                    <label>手機：</label>
+                    <input type="tel" name="phoneNumber" required/>
+                </div>
+            </div>
+
+            <div id="coachFields" style="display: none;">
+                <div class="form-row">
+                    <label>教練姓名：</label>
+                    <input type="text" name="cName" disabled required/>
+                </div>
+                <div class="form-row">
+                    <label>專長類別：</label>
+                    <input type="text" name="coachingType" placeholder="例如: 瑜珈, 重量訓練" disabled required/>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <label>密碼：</label>
+                <input type="password" name="password" required/>
+            </div>
+            
+            <div class="form-row button-row">
+                <a href="{{ url_for('index') }}">
+                    <button type="button" class="register_btn" style="margin-right: 15px;">回上頁</button>
+                </a>
+                <button type="submit" class="register_btn"> 註冊</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function toggleFields() {
+        const selector = document.getElementById('identitySelector');
+        const userIdLabel = document.getElementById('userIdLabel');
+        
+        const memberDiv = document.getElementById('memberFields');
+        const coachDiv = document.getElementById('coachFields');
+        
+        const memberInputs = memberDiv.querySelectorAll('input, select');
+        const coachInputs = coachDiv.querySelectorAll('input, select');
+
+        if (selector.value === 'member') {
+            userIdLabel.textContent = '會員 ID：'; 
+            memberDiv.style.display = 'block';
+            memberInputs.forEach(input => input.disabled = false); 
+
+            coachDiv.style.display = 'none';
+            coachInputs.forEach(input => input.disabled = true); 
+
+        } else if (selector.value === 'coach') {
+            memberDiv.style.display = 'none';
+            memberInputs.forEach(input => input.disabled = true); 
+
+            userIdLabel.textContent = '教練代碼：'; 
+            coachDiv.style.display = 'block';
+            coachInputs.forEach(input => input.disabled = false); 
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', toggleFields);
+</script>
+
+{% endblock content%}
