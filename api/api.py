@@ -20,7 +20,7 @@ from flask_login import (
 )
 
 # ============================================================
-# 資料庫連線設定：環境變數優先，沒有就用老師的那組
+# 資料庫連線設定：環境變數優先，沒有就用老師給的那組
 # ============================================================
 
 load_dotenv()
@@ -35,7 +35,6 @@ DB_PORT = os.getenv("DB_PORT", "5432")
 def get_connection():
     """
     每次需要時建立一個新的連線（避免長時間連線被 Render 砍掉）。
-    這樣比較保險，專題規模也 OK。
     """
     conn = psycopg2.connect(
         user=DB_USER,
@@ -54,7 +53,8 @@ def get_connection():
 
 api = Blueprint("api", __name__, template_folder="./templates")
 
-login_manager = LoginManager(api)
+# 這裡只建立 LoginManager 物件，真正綁到 app 是在 app.py 裡的 login_manager.init_app(app)
+login_manager = LoginManager()
 login_manager.login_view = "api.login"
 login_manager.login_message = "請先登入"
 
@@ -78,10 +78,10 @@ class User(UserMixin):
 def get_member_by_account(account_id):
     """
     依照「會員登入帳號」查詢會員。
-    這裡假設：
-      table: member
-      columns: account, fname, password
-    你可以依照實際欄位名稱調整 SQL。
+
+    假設 member table 結構：
+      mid, fname, account, password, identity, lname
+
     回傳 (name, password) 或 None
     """
     sql = """
@@ -104,9 +104,10 @@ def get_member_by_account(account_id):
 def get_coach_by_id(coach_id):
     """
     依照教練代碼查詢教練。
-    假設：
-      table: coach
-      columns: coachid, cname, password
+
+    假設 coach table 結構：
+      coachid, cname, coachingtype, password, class
+
     回傳 (name, password) 或 None
     """
     sql = """
@@ -177,7 +178,7 @@ def login():
                 user.role = "member"
                 user.name = name
                 login_user(user)
-                # 登入成功，導向會員前台（依你原本的 Blueprint 名稱）
+                # 登入成功，導向會員前台
                 return redirect(url_for("frontdesk.member_home"))
             else:
                 flash("*密碼錯誤")
@@ -208,8 +209,7 @@ def login():
 
 
 # ============================================================
-# Register（若專題沒用到，可以先不碰）
-# 下面寫的是一個「示範版本」，你可以依實際欄位調整。
+# Register（如果專題有用到註冊就留著，沒用可以不呼叫）
 # ============================================================
 
 @api.route("/register", methods=["POST", "GET"])
