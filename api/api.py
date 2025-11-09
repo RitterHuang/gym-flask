@@ -1,162 +1,311 @@
-import imp
-from flask import render_template, Blueprint, redirect, request, url_for, flash
-from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
-# from link import *
-from api.sql import * # 假設這裡有 Member 和 Coach 的 SQL 操作 Class
+import os
+import psycopg2
+from dotenv import load_dotenv
 
-api = Blueprint('api', __name__, template_folder='./templates')
+from flask import (
+    render_template,
+    Blueprint,
+    redirect,
+    request,
+    url_for,
+    flash,
+)
+from flask_login import (
+    LoginManager,
+    UserMixin,
+    login_user,
+    logout_user,
+    login_required,
+    current_user,
+)
+
+# ============================================================
+# 資料庫連線設定：環境變數優先，沒有就用老師的那組
+# ============================================================
+
+load_dotenv()
+
+DB_USER = os.getenv("DB_USER", "project_7")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "i68g8q")
+DB_NAME = os.getenv("DB_NAME", "project_7")
+DB_HOST = os.getenv("DB_HOST", "140.117.68.66")
+DB_PORT = os.getenv("DB_PORT", "5432")
+
+
+def get_connection():
+    """
+    每次需要時建立一個新的連線（避免長時間連線被 Render 砍掉）。
+    這樣比較保險，專題規模也 OK。
+    """
+    conn = psycopg2.connect(
+        user=DB_USER,
+        password=DB_PASSWORD,
+        host=DB_HOST,
+        port=DB_PORT,
+        dbname=DB_NAME,
+    )
+    conn.autocommit = True
+    return conn
+
+
+# ============================================================
+# Flask Blueprint & LoginManager 設定
+# ============================================================
+
+api = Blueprint("api", __name__, template_folder="./templates")
 
 login_manager = LoginManager(api)
-login_manager.login_view = 'api.login'
+login_manager.login_view = "api.login"
 login_manager.login_message = "請先登入"
 
+
 class User(UserMixin):
-    pass
+    """
+    flask_login 使用的使用者物件
+    多加兩個屬性：role, name
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.role = None  # 'member' or 'coach'
+        self.name = None  # 顯示名字
+
+
+# ------------------------------------------------------------
+# 工具函式：從 DB 查詢會員 / 教練
+# ------------------------------------------------------------
+
+def get_member_by_account(account_id):
+    """
+    依照「會員登入帳號」查詢會員。
+    這裡假設：
+      table: member
+      columns: account, fname, password
+    你可以依照實際欄位名稱調整 SQL。
+    回傳 (name, password) 或 None
+    """
+    sql = """
+        SELECT "fname", "password"
+        FROM member
+        WHERE "account" = %s
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, (account_id,))
+            row = cur.fetchone()
+            if row:
+                return row[0], row[1]  # name, password
+    finally:
+        conn.close()
+    return None
+
+
+def get_coach_by_id(coach_id):
+    """
+    依照教練代碼查詢教練。
+    假設：
+      table: coach
+      columns: coachid, cname, password
+    回傳 (name, password) 或 None
+    """
+    sql = """
+        SELECT "cname", "password"
+        FROM coach
+        WHERE "coachid" = %s
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, (coach_id,))
+            row = cur.fetchone()
+            if row:
+                return row[0], row[1]  # name, password
+    finally:
+        conn.close()
+    return None
+
+
+# ------------------------------------------------------------
+# flask_login user_loader
+# user.id 會長這樣：'member_<帳號>' 或 'coach_<教練代碼>'
+# ------------------------------------------------------------
 
 @login_manager.user_loader
-def user_loader(userid): # userid 格式為 'member_M0000001' 或 'coach_T0001'
-    """
-    根據 flask_login 儲存的 userid (帶有前綴)，
-    從正確的資料表 (Member 或 Coach) 載入使用者資訊。
-    """
+def user_loader(userid: str):
     user = User()
     user.id = userid
-    
+
     try:
-        # 分割 userid, 例如 'member_M0000001' -> ['member', 'M0000001']
-        role, id = userid.split('_', 1) 
-        
-        if role == 'member':
-            data = Member.get_by_id(id) 
-            user.role = 'member'
-            user.name = data[0][0] # data = (mName, password)
-        elif role == 'coach':
-            data = Coach.get_by_id(id)
-            user.role = 'coach'
-            user.name = data[0][0] # data = (cName, password)
-            
+        role, real_id = userid.split("_", 1)
+
+        if role == "member":
+            data = get_member_by_account(real_id)
+            if data:
+                user.role = "member"
+                user.name = data[0]
+
+        elif role == "coach":
+            data = get_coach_by_id(real_id)
+            if data:
+                user.role = "coach"
+                user.name = data[0]
+
     except Exception as e:
-        print(f"user_loader 錯誤: {e}") # 偵錯用
-        pass
+        print(f"user_loader 錯誤: {e}")
+
     return user
 
-@api.route('/login', methods=['POST', 'GET'])
+
+# ============================================================
+# Login
+# ============================================================
+
+@api.route("/login", methods=["POST", "GET"])
 def login():
-    if request.method == 'POST':
-        # 這個 'account' 欄位現在代表 'memberId' 或 'coachId'
-        account_id = request.form['account'] 
-        password = request.form['password']
+    if request.method == "POST":
+        account_id = request.form["account"]  # 對 member 是 account, 對 coach 是 coachid
+        password = request.form["password"]
 
-        # 策略：先嘗試將 account_id 視為 memberId
-        member_data = Member.get_by_id(account_id) 
-
+        # 1️⃣ 先試著當成會員帳號 (member.account)
+        member_data = get_member_by_account(account_id)
         if member_data:
-            DB_password = member_data[0][1] # member_data = (mName, password)
-            
-            if DB_password == password:
+            name, db_password = member_data
+            if db_password == password:
                 user = User()
-                user.id = f"member_{account_id}" # 加上 'member_' 前綴
+                user.id = f"member_{account_id}"
+                user.role = "member"
+                user.name = name
                 login_user(user)
-                # 登入成功，導向課程預約頁面
-                return redirect(url_for('frontdesk.member_home'))
+                # 登入成功，導向會員前台（依你原本的 Blueprint 名稱）
+                return redirect(url_for("frontdesk.member_home"))
             else:
-                flash('*密碼錯誤')
-                return redirect(url_for('api.login'))
+                flash("*密碼錯誤")
+                return redirect(url_for("api.login"))
 
-        # 如果不是 Member，再嘗試將 account_id 視為 coachId
-        coach_data = Coach.get_by_id(account_id)
-        
+        # 2️⃣ 如果不是會員，就試著當成教練代碼 (coach.coachid)
+        coach_data = get_coach_by_id(account_id)
         if coach_data:
-            DB_password = coach_data[0][1] # coach_data = (cName, password)
-            
-            if DB_password == password:
+            name, db_password = coach_data
+            if db_password == password:
                 user = User()
-                user.id = f"coach_{account_id}" # 加上 'coach_' 前綴
+                user.id = f"coach_{account_id}"
+                user.role = "coach"
+                user.name = name
                 login_user(user)
-                # 登入成功，導向教練後台 (名稱待修改)
-                return redirect(url_for('manager.courseManager'))
+                # 登入成功，導向教練後台
+                return redirect(url_for("manager.courseManager"))
             else:
-                flash('*密碼錯誤')
-                return redirect(url_for('api.login'))
+                flash("*密碼錯誤")
+                return redirect(url_for("api.login"))
 
-        # 如果兩個資料表都找不到
-        flash('*查無此帳號')
-        return redirect(url_for('api.login'))
-    
-    return render_template('login.html')
+        # 3️⃣ 兩邊都找不到
+        flash("*查無此帳號")
+        return redirect(url_for("api.login"))
 
-@api.route('/register', methods=['POST', 'GET'])
+    # GET：顯示登入頁
+    return render_template("login.html")
+
+
+# ============================================================
+# Register（若專題沒用到，可以先不碰）
+# 下面寫的是一個「示範版本」，你可以依實際欄位調整。
+# ============================================================
+
+@api.route("/register", methods=["POST", "GET"])
 def register():
     """
-    處理註冊，根據 'identity' 欄位決定寫入 Member 還是 Coach 資料表。
+    identity: 'member' 或 'coach'
+    member: 會寫入 member table
+    coach : 會寫入 coach table
     """
-    if request.method == 'POST':
-        identity = request.form['identity'] # 假設前端有 'identity' (value: 'member' 或 'coach')
-        password = request.form['password']
+    if request.method == "POST":
+        identity = request.form["identity"]
+        password = request.form["password"]
 
         try:
-            if identity == 'member':
-                # 1. 取得 Member 表單所有欄位
-                member_id = request.form['userId']
-                
-                # 2. 檢查 memberId 是否已被註冊
-                if Member.get_by_id(member_id):
-                    flash('此會員 ID 已被註冊')
-                    return redirect(url_for('api.register'))
+            if identity == "member":
+                # 假設前端欄位：
+                #   userId  -> 帳號 (member.account)
+                #   fname   -> 名
+                #   lname   -> 姓 (可選)
+                account = request.form["userId"]
+                fname = request.form.get("fname", "")
+                lname = request.form.get("lname", "")
 
-                input_data = {
-                    'memberId': member_id, # 會員 ID (登入帳號)
-                    'mName': request.form['mName'],
-                    'birthDate': request.form['birthDate'],
-                    'gender': request.form['gender'],
-                    'phoneNumber': request.form['phoneNumber'],
-                    'password': password
-                    # 'registerDate' 應由 SQL 的 NOW() 產生
-                    # 'status' 應設為預設值 (例如 'pending_contract')
-                    # 'planId' 應為 NULL
-                }
-                
-                # 3. 建立會員
-                Member.create_member(input_data)
-                flash('會員註冊成功！請登入並完成合約簽署')
-                
-            elif identity == 'coach':
-                # 1. 取得 Coach 表單所有欄位
-                coach_id = request.form['userId'] # 教練 ID
+                # 檢查是否已存在
+                conn = get_connection()
+                with conn.cursor() as cur:
+                    cur.execute(
+                        'SELECT 1 FROM member WHERE "account" = %s',
+                        (account,),
+                    )
+                    if cur.fetchone():
+                        flash("此會員帳號已被註冊")
+                        conn.close()
+                        return redirect(url_for("api.register"))
 
-                # 2. 檢查 Coach ID 是否已被註冊
-                #    使用上面 login 也在用的 Coach.get_by_coachId()
-                if Coach.get_by_id(coach_id):
-                    flash('此教練代碼已被註冊')
-                    return redirect(url_for('api.register'))
+                    cur.execute(
+                        """
+                        INSERT INTO member("fname", "lname", "account", "password", "identity")
+                        VALUES (%s, %s, %s, %s, %s)
+                        """,
+                        (fname, lname, account, password, "member"),
+                    )
+                conn.close()
+                flash("會員註冊成功！請登入")
 
-                input_data = {
-                    'coachId': coach_id, 
-                    'cName': request.form['cName'],
-                    'coachingType': request.form['coachingType'],
-                    'password': password
-                    # 'class' 欄位在 DDL 中，依需求加入
-                }
+            elif identity == "coach":
+                # 假設前端欄位：
+                #   userId        -> 教練代碼 (coach.coachid)
+                #   cName         -> 教練姓名 (coach.cname)
+                #   coachingType  -> 教學類型 (coach.coachingtype)
+                coach_id = request.form["userId"]
+                c_name = request.form["cName"]
+                coaching_type = request.form["coachingType"]
 
-                # 3. 建立教練
-                # !!注意: 您需要在 sql.py 中建立 Coach.create_coach(input_data) 函式
-                Coach.create_coach(input_data)
-                flash('教練註冊成功！請登入')
+                conn = get_connection()
+                with conn.cursor() as cur:
+                    cur.execute(
+                        'SELECT 1 FROM coach WHERE "coachid" = %s',
+                        (coach_id,),
+                    )
+                    if cur.fetchone():
+                        flash("此教練代碼已被註冊")
+                        conn.close()
+                        return redirect(url_for("api.register"))
+
+                    cur.execute(
+                        """
+                        INSERT INTO coach("coachid", "cname", "coachingtype", "password")
+                        VALUES (%s, %s, %s, %s)
+                        """,
+                        (coach_id, c_name, coaching_type, password),
+                    )
+                conn.close()
+                flash("教練註冊成功！請登入")
 
             else:
-                flash('無效的身分')
-                return redirect(url_for('api.register'))
+                flash("無效的身分")
+                return redirect(url_for("api.register"))
 
-            # 不論註冊身分為何，成功後都導向登入頁
-            return redirect(url_for('api.login'))
+            # 成功之後導回登入頁
+            return redirect(url_for("api.login"))
 
         except Exception as e:
-            flash(f'註冊失敗: {e}')
-            return redirect(url_for('api.register'))
+            flash(f"註冊失敗: {e}")
+            return redirect(url_for("api.register"))
 
-    return render_template('register.html')
+    # GET：顯示註冊頁
+    return render_template("register.html")
 
-@api.route('/logout')
+
+# ============================================================
+# Logout
+# ============================================================
+
+@api.route("/logout")
+@login_required
 def logout():
     logout_user()
-    return redirect(url_for('index'))
+    return redirect(url_for("index"))
