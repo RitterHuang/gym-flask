@@ -1,4 +1,7 @@
-﻿alembic==1.7.7
+﻿setuptools>=65.0.0
+wheel
+
+alembic==1.7.7
 click==8.1.0
 colorama==0.4.4
 Flask==2.1.0
